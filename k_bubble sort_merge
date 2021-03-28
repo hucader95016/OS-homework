@@ -1,0 +1,23 @@
+# include <stdio.h>
+# include <time.h>
+# include <vector>
+
+std :: vector<int> BubbleSort( vector<int> arr ) ;
+std :: vector< vector<int> > Merge( vector< vector<int> > duArr ) ;
+
+int main() {
+  int k_files ;
+  scanf( "%d", &k_files ) ;
+  
+  // cut file to k
+  // sort k files
+  // merge k files
+} // main()
+
+std :: vector<int> BubbleSort( vector<int> arr ) {
+
+} // BubbleSort()
+
+std :: vector< vector<int> > Merge( vector< vector<int> > duArr ) {
+
+} // Merge()
