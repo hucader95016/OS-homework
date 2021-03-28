@@ -2,22 +2,96 @@
 # include <time.h>
 # include <vector>
 
-std :: vector<int> BubbleSort( vector<int> arr ) ;
-std :: vector< vector<int> > Merge( vector< vector<int> > duArr ) ;
+using namespace std ;
+
+vector< vector<int> > CutFiles( vector<int> originData, int k_files ) ;
+void BubbleSort( vector<int> &arr ) ;
+vector<int> Merge( vector<int> leftSub, vector<int> rightSub ) ;
 
 int main() {
-  int k_files ;
-  scanf( "%d", &k_files ) ;
-  
-  // cut file to k
+  int numOfFiles ;
+  time_t start, end;
+  vector<int> originData ;
+  scanf( "%d", &numOfFiles ) ;
+  start = time(NULL);
+  // cut files in k
   // sort k files
   // merge k files
+  vector< vector<int> > k_files = CutFiles( originData, numOfFiles ) ;
+  for ( int i = 0 ; i < k_files.size() ; i++ ) {
+    BubbleSort( k_files[i] ) ;
+  } // for()
+  
+  originData = Merge( k_files[0], k_files[1] ) ;
+  for ( int i = 2 ; i < k_files.size() ; i++ ) {
+    originData = Merge( originData,  k_files[i] ) ;
+  } // for()
+  
+  end = time(NULL);
+  double diff = difftime(end, start);
+  printf( "CPU runtime:%f", diff ) ;
 } // main()
 
-std :: vector<int> BubbleSort( vector<int> arr ) {
-
+void BubbleSort( vector<int> &arr ) {
+  for ( int i = 0 ; i < arr.size() ; i++ ) {
+    for ( int j = arr.size() ; j > i ; j-- ) {
+      if ( arr[j-1] < arr[j] ) {
+        arr[j] = arr[j] + arr[j-1] ; // a=j-1, b=j, a+b
+        arr[j-1] = arr[j] - arr[j-1] ; // a+b-a = b
+        arr[j] = arr[j] - arr[j-1] ; // a+b-b = a
+	  } // if
+	} // for
+  } // for
 } // BubbleSort()
 
-std :: vector< vector<int> > Merge( vector< vector<int> > duArr ) {
-
+vector<int> Merge( vector<int> leftSub, vector<int> rightSub ) {
+  int leftSize = leftSub.size(), rightSize = rightSub.size() ; 
+  int leftIdx = 0, rightIdx = 0, arrSize = leftSize + rightSize ;
+  vector<int> arr ;
+  
+  for ( int i = 0 ; i < arrSize ; i++ ) {
+    if ( leftIdx >= leftSize ) {
+      arr[i] = rightSub[rightIdx] ;
+      rightIdx++ ;
+	} // if
+	
+	else if ( rightIdx >= rightSize ) {
+	  arr[i] = leftSub[leftIdx] ;
+	  leftIdx++ ;
+	} // else if
+	
+	else {
+	  if ( leftSub[leftIdx] <= rightSub[rightIdx] ) {
+	    arr[i] = leftSub[leftIdx] ;
+	    leftIdx++ ;
+	  } // if
+	  
+      else {
+        arr[i] = rightSub[rightIdx] ;
+        rightIdx++ ;
+	  } // else
+	} // else
+  } // for
+  
+  return arr ;
 } // Merge()
+
+vector< vector<int> > CutFiles( vector<int> originData, int numOfFiles ) {
+  vector< vector<int> > k_files ;
+  int numOfIntInFile = originData.size() / numOfFiles ;
+  int numOfPlusOneInt = originData.size() - ( numOfIntInFile * numOfFiles ) ;
+  vector<int>::iterator it = originData.begin() ;
+  for ( int i = 0 ; i < numOfFiles ; i++ ) {
+    if ( i < numOfPlusOneInt ) {
+      k_files[i].assign( it, it + numOfIntInFile + 1 )  ;
+      it = it + numOfIntInFile + 2 ;
+	} //  if
+	 
+	else  {
+	  k_files[i].assign( it, it + numOfIntInFile ) ;
+      it = it + numOfIntInFile + 1 ;
+	} //  else
+  }  // for
+  
+  return k_files ;
+} // CutFiles()
