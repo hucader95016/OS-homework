@@ -1,0 +1,29 @@
+# include <stdio.h>
+# include <stdlib.h>
+# include <time.h>
+# include <vector>
+
+int main() {
+  // 儲存時間用的變數
+  time_t start, end;
+  std :: vector<int> arr ;
+  // 開始計算時間
+  start = time(NULL);
+
+  for ( int i = 0 ; i < arr.size() ; i++ ) {
+    for ( int j = arr.size() ; j > i ; j-- ) {
+      if ( arr[j-1] < arr[j] ) {
+        arr[j] = arr[j] + arr[j-1] ; // a=j-1, b=j, a+b
+        arr[j-1] = arr[j] - arr[j-1] ; // a+b-a = b
+        arr[j] = arr[j] - arr[j-1] ; // a+b-b = a
+	  } // if
+	} // for
+  } // for
+  
+  // 結束計算時間
+  end = time(NULL);
+
+  // 計算實際花費時間
+  double diff = difftime(end, start);
+  printf( "CPU runtime:%f", diff ) ;
+} // main()
