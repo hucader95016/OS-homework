@@ -1,0 +1,260 @@
+# include <stdio.h>
+# include <stdlib.h>
+# include <time.h>
+# include <vector>
+# include <fstream>
+# include <iostream>
+# include <thread>
+# include <queue>
+# include <windows.h>
+
+using namespace std ;
+
+typedef thread *threadPtr ;
+queue< vector<int> > myQ ;
+
+void ReadInput( vector<int> &arr, string &fileName ) ;
+void WriteOutput( vector<int> arr, double  runTime, string fileName ) ;
+vector<int> BubbleSort( vector<int> arr, bool isThread ) ;
+vector< vector<int> > CutFiles( vector<int> originData, int k_files ) ;
+vector<int> Merge( vector<int> leftSub, vector<int> rightSub, bool isThread ) ;
+
+int main() {
+  // 儲存時間用的變數
+  time_t start, end;
+  vector<int> origin, sorted ;
+  vector< vector<int> > k_files ;
+  int numOfFiles ;
+  double runtime ;
+  string fileName ;
+
+  ReadInput( origin, fileName ) ; 
+  cout << "請輸入要切成幾份：\n" ;
+  cin >> numOfFiles ;
+
+  threadPtr threads[numOfFiles] ;
+
+  // -----------------------------------------------------start
+  // 開始計算時間
+  start = time(NULL);
+  sorted = BubbleSort( origin, false ) ;
+  // 結束計算時間
+  end = time(NULL);
+
+  // 計算實際花費時間
+  runtime = end - start ; //difftime( end, start );
+  WriteOutput( sorted, runtime, fileName + "_myOutput1" )  ;
+  printf( "CPU runtime:%f\n", runtime ) ;
+  
+  //-----------------------------------------------------1 end
+  sorted.clear() ;
+  k_files = CutFiles( origin, numOfFiles ) ;
+  start = time(NULL);
+  
+  for ( int i = 0 ; i < numOfFiles ; i++ ) {
+    threads[i] = new thread( BubbleSort, k_files[i], true ) ;
+  } // for
+
+  for ( int i = 0 ; i < numOfFiles ; i++ ) {
+    threads[i] -> join() ;
+  } // for
+  
+  int tempOfNumOfFiles = numOfFiles ;
+  while ( tempOfNumOfFiles != 1 ) { // threads merge
+    int threadCount = 0 ;
+    if ( tempOfNumOfFiles % 2 == 0 ) {
+      for ( int i= 0 ; i < tempOfNumOfFiles-1 ; i += 2 ) {
+        vector<int> temp = myQ.front() ;
+        myQ.pop() ;
+        threads[threadCount] = new thread( Merge, temp, myQ.front(), true ) ;
+        myQ.pop() ;
+        threadCount++ ;
+      } // for
+
+      Sleep(2) ;
+    }  // if
+
+    else {
+      for ( int i= 0 ; i < tempOfNumOfFiles-2 ; i += 2 ) {
+        vector<int> temp = myQ.front() ;
+        myQ.pop() ;
+        threads[threadCount] = new thread( Merge, temp, myQ.front(), true ) ;
+        myQ.pop() ;
+        threadCount++ ;
+      } // for
+
+      Sleep(2) ;
+      tempOfNumOfFiles++ ;
+    } //  else
+
+    for ( int i = 0 ; i < threadCount ; i++ ) {
+      threads[i] -> join()  ;
+    } // for
+
+    tempOfNumOfFiles = tempOfNumOfFiles / 2 ;
+  } // while
+  // 結束計算時間
+  sorted = myQ.front() ;
+  myQ.pop() ;
+
+  // 結束計算時間
+  end = time(NULL);
+
+  // 計算實際花費時間
+  runtime = difftime(end, start);
+  WriteOutput( sorted, runtime, fileName + "_myOutput2" )  ;
+  printf( "CPU runtime:%f\n", runtime ) ;
+  
+  //------------------------------------------------------2 end
+  /*sorted.clear() ;
+  k_files = CutFiles( origin, numOfFiles ) ;
+  start = time(NULL);
+
+  end = time(NULL);
+
+  // 計算實際花費時間
+  runtime = difftime(end, start);
+  WriteOutput( sorted, runtime, fileName + "_myOutput3" )  ;
+  printf( "CPU runtime:%f\n", runtime ) ;*/
+  
+  //-----------------------------------------------------3 end
+  sorted.clear() ;
+  k_files = CutFiles( origin, numOfFiles ) ;
+  start = time(NULL);
+  int i, j ;
+  for ( i = 0 ; i < k_files.size() ; i++ ) {
+    k_files[i] = BubbleSort( k_files[i], false ) ;
+  } // for()
+  
+  sorted =  k_files[0] ;
+  for ( int i = 1 ; i < k_files.size() ; i++ ) {
+    sorted = Merge( sorted, k_files[i], false ) ;
+  } // for()
+  // 結束計算時間
+  end = time(NULL);
+
+  // 計算實際花費時間
+  runtime = difftime(end, start);
+  WriteOutput( sorted, runtime, fileName + "_myOutput4" )  ;
+  printf( "CPU runtime:%f\n", runtime ) ;
+  // ---------------------------------------------------4 end
+} // main()
+
+void ReadInput( vector<int> &arr, string &fileName ) { 
+  fstream infile ;
+  int buf ;
+  cout << "請輸入檔案名稱\n" ;
+  cin >>  fileName ;
+  infile.open( ( "\input\\" + fileName + ".txt" ).c_str(), fstream::in )  ;
+  while( !infile.is_open() ) {
+	cout << "檔案名稱錯誤,重新輸入：" ;
+    cin >> fileName;
+    infile.open( ( "\input\\" + fileName + ".txt" ).c_str(), fstream::in ) ;
+  } //while
+
+  while( infile >> buf ) {
+    arr.push_back( buf ) ;
+  } // while 
+} // readInput()
+
+void WriteOutput( vector<int> arr, double  runTime, string fileName ) {
+  time_t now = time(0);
+  tm *ltm = localtime(&now);
+  fstream outfile ;
+  outfile.open( ( fileName + ".txt").c_str(), fstream::out ) ;
+  outfile << "Sort：\n" ;
+  for ( int i = 0 ; i < arr.size() ; i++ ) {
+    outfile << arr[i] << endl ; 
+  } // for
+
+  outfile << "CPU Time：" << runTime << endl ;
+  outfile << "Output Time：" << 
+ 
+  // 輸出 tm 結構的各個組成部分
+  outfile << 1900 + ltm->tm_year ;
+  outfile << "-"<< 1 + ltm->tm_mon ;
+  outfile << "-"<<  ltm->tm_mday ;
+  outfile << " "<< ltm->tm_hour << ":";
+  outfile << ltm->tm_min << ":";
+  outfile << ltm->tm_sec << endl;
+  outfile.close() ;
+} // writeOutput()
+
+vector<int> BubbleSort( vector<int> arr, bool isThread ) {
+  for ( int i = 0 ; i < arr.size() ; i++ ) {
+    for ( int j = arr.size()-1 ; j > i ; j-- ) {
+      if ( arr[j-1] > arr[j] ) {
+        arr[j] = arr[j] + arr[j-1] ; // a=j-1, b=j, a+b
+        arr[j-1] = arr[j] - arr[j-1] ; // a+b-a = b
+        arr[j] = arr[j] - arr[j-1] ; // a+b-b = a
+	  } // if
+	} // for
+
+    //cout << i << endl ;
+  } // for
+
+  if ( isThread ) {
+    myQ.push( arr ) ;
+  } // if
+  return arr ;
+} // BubbleSort()
+
+vector<int> Merge( vector<int> leftSub, vector<int> rightSub, bool isThread ) {
+  int leftSize = leftSub.size(), rightSize = rightSub.size() ; 
+  int leftIdx = 0, rightIdx = 0, arrSize = leftSize + rightSize ;
+  vector<int> arr;
+  arr.resize( arrSize ) ;
+
+  for ( int i = 0 ; i < arrSize ; i++ ) {
+	if ( rightIdx >= rightSize ) { // ?/0 => sorted
+	  arr[i] = leftSub[leftIdx] ;
+	  leftIdx++ ;
+	} // else if
+
+    else if ( leftIdx >= leftSize ) { // 0/? => sorted
+      arr[i] = rightSub[rightIdx] ;
+      rightIdx++ ;
+	} // if
+	
+	else {
+	  if ( leftSub[leftIdx] <= rightSub[rightIdx] ) {
+	    arr[i] = leftSub[leftIdx] ;
+	    leftIdx++ ;
+	  } // if
+	  
+      else {
+        arr[i] = rightSub[rightIdx] ;
+        rightIdx++ ;
+	  } // else
+	} // else
+  } // for
+
+  if ( isThread ) {
+    myQ.push( arr ) ;
+  } // if 
+  return arr ;
+} // Merge()
+
+vector< vector<int> > CutFiles( vector<int> originData, int numOfFiles ) {
+  vector< vector<int> > k_files ;
+  k_files.resize( numOfFiles ) ;
+  int numOfIntInFile = originData.size() / numOfFiles ;
+  int numOfPlusOneInt = originData.size() - ( numOfIntInFile * numOfFiles ) ;  // 取餘數 
+  vector<int>::iterator it = originData.begin() ;
+  for ( int i = 0 ; i < numOfFiles ; i++ ) {
+    if ( i < numOfPlusOneInt ) {
+      k_files[i].assign( it, it + numOfIntInFile + 1 )  ;
+      it = it + numOfIntInFile + 1 ;
+	} //  if
+	 
+	else  {
+	  k_files[i].assign( it, it + numOfIntInFile ) ;
+      it = it + numOfIntInFile ;
+	} //  else
+  }  // for
+  
+  return k_files ;
+} // CutFiles()
+
+
+
