@@ -19,108 +19,163 @@ vector<int> BubbleSort( vector<int> arr, bool isThread ) ;
 vector< vector<int> > CutFiles( vector<int> originData, int k_files ) ;
 vector<int> Merge( vector<int> leftSub, vector<int> rightSub, bool isThread ) ;
 
+class Cleaner {
+  public :
+    static void clear( vector<int> &v ) {
+      vector<int> empty ;
+      empty.swap( v ) ;
+    } // clear()
+
+    static void clear( vector< vector<int> > &v ) {
+      vector< vector<int> > empty ;
+      empty.swap( v ) ;
+    } // clear()
+
+    static void clear( vector<threadPtr> &v ) {
+      vector<threadPtr> empty ;
+      empty.swap( v ) ;
+    } // clear()
+
+    static void clear( queue<vector<int>> &q ) {
+      queue<vector<int>> empty ;
+      empty.swap( q ) ;
+    } // clear()
+};
+
 int main() {
-  // 儲存時間用的變數
+  // Àx¦s®É¶¡¥ÎªºÅÜ¼Æ
+  while ( true ) {
   time_t start, end;
   vector<int> origin, sorted ;
   vector< vector<int> > k_files ;
   int numOfFiles ;
   double runtime ;
   string fileName ;
-
   ReadInput( origin, fileName ) ; 
-  cout << "請輸入要切成幾份：\n" ;
+  cout << "½Ð¿é¤J­n¤Á¦¨´X¥÷¡G\n" ;
   cin >> numOfFiles ;
 
-  threadPtr threads[numOfFiles] ;
-
-  // -----------------------------------------------------start
-  // 開始計算時間
-  start = time(NULL);
+  /*// -----------------------------------------------------1 start
+  // ¶}©l­pºâ®É¶¡
+  // start = time(NULL);
+  start = clock() ;
   sorted = BubbleSort( origin, false ) ;
-  // 結束計算時間
-  end = time(NULL);
+  // µ²§ô­pºâ®É¶¡
+  // end = time(NULL);
+  end = clock() ;
 
-  // 計算實際花費時間
+  // ­pºâ¹ê»Úªá¶O®É¶¡
   runtime = end - start ; //difftime( end, start );
   WriteOutput( sorted, runtime, fileName + "_myOutput1" )  ;
-  printf( "CPU runtime:%f\n", runtime ) ;
+  printf( "1.CPU runtime:%fms\n", runtime ) ;
+  Cleaner.clear( sorted ) ;
   
-  //-----------------------------------------------------1 end
-  sorted.clear() ;
+  //-----------------------------------------------------1 end*/
+  // ----------------------------------------------------2 start
+
+  vector<threadPtr> threads ;
+  threads.resize( numOfFiles ) ;
   k_files = CutFiles( origin, numOfFiles ) ;
-  start = time(NULL);
+  start = clock() ;
   
-  for ( int i = 0 ; i < numOfFiles ; i++ ) {
+  for ( int i = 0 ; i < numOfFiles ; i++ ) { 
     threads[i] = new thread( BubbleSort, k_files[i], true ) ;
   } // for
 
+  cout << "pass bubble\n" ;
+
   for ( int i = 0 ; i < numOfFiles ; i++ ) {
     threads[i] -> join() ;
+    delete( threads[i] ) ;
   } // for
-  
+
+  Cleaner::clear( threads ) ;
+  cout << "pass join\n" ;
+
   int tempOfNumOfFiles = numOfFiles ;
   while ( tempOfNumOfFiles != 1 ) { // threads merge
     int threadCount = 0 ;
+    threads.resize( tempOfNumOfFiles/2 ) ;
     if ( tempOfNumOfFiles % 2 == 0 ) {
-      for ( int i= 0 ; i < tempOfNumOfFiles-1 ; i += 2 ) {
+      cout << tempOfNumOfFiles << ":\n" ;
+      for ( int i= 0 ; i < tempOfNumOfFiles ; i += 2 ) {
         vector<int> temp = myQ.front() ;
         myQ.pop() ;
-        threads[threadCount] = new thread( Merge, temp, myQ.front(), true ) ;
+        vector<int> temp2 = myQ.front() ;
         myQ.pop() ;
+        cout << "pass" << i << ", " ;
+        threads[threadCount] = new thread( Merge, temp, temp2, true ) ;
         threadCount++ ;
+        Cleaner::clear( temp ) ;
+        Cleaner::clear( temp2 ) ;
+        cout << "pass" << i << endl ;
       } // for
-
-      Sleep(2) ;
     }  // if
 
     else {
-      for ( int i= 0 ; i < tempOfNumOfFiles-2 ; i += 2 ) {
+      cout << tempOfNumOfFiles << ":\n" ;
+      for ( int i= 0 ; i < tempOfNumOfFiles-1 ; i += 2 ) {
         vector<int> temp = myQ.front() ;
         myQ.pop() ;
-        threads[threadCount] = new thread( Merge, temp, myQ.front(), true ) ;
+        vector<int> temp2 = myQ.front() ;
         myQ.pop() ;
+        cout << "pass" << i << ", " ;
+        threads[threadCount] = new thread( Merge, temp, temp2, true ) ;
         threadCount++ ;
+        Cleaner::clear( temp ) ;
+        Cleaner::clear( temp2 ) ;
+        cout << "pass" << i << endl ;
       } // for
 
-      Sleep(2) ;
       tempOfNumOfFiles++ ;
     } //  else
 
     for ( int i = 0 ; i < threadCount ; i++ ) {
-      threads[i] -> join()  ;
+      threads[i] -> join() ;
+      delete( threads[i] ) ;
     } // for
 
+    cout << "pass merge:" << tempOfNumOfFiles << endl ;
+    Cleaner::clear( threads ) ;
     tempOfNumOfFiles = tempOfNumOfFiles / 2 ;
   } // while
-  // 結束計算時間
+
+  cout << "pass merge\n" ;
+
+  // µ²§ô­pºâ®É¶¡
   sorted = myQ.front() ;
   myQ.pop() ;
 
-  // 結束計算時間
-  end = time(NULL);
+  // µ²§ô­pºâ®É¶¡
+  // end = time(NULL);
+  end = clock() ;
 
-  // 計算實際花費時間
+  // ­pºâ¹ê»Úªá¶O®É¶¡
   runtime = difftime(end, start);
   WriteOutput( sorted, runtime, fileName + "_myOutput2" )  ;
-  printf( "CPU runtime:%f\n", runtime ) ;
+  printf( "2.CPU runtime:%fms\n", runtime ) ;
+  Cleaner::clear( sorted ) ;
+  Cleaner::clear( myQ ) ;
   
   //------------------------------------------------------2 end
-  /*sorted.clear() ;
-  k_files = CutFiles( origin, numOfFiles ) ;
+  /*//-----------------------------------------------------3 start
+  sorted.clear() ;
   start = time(NULL);
 
   end = time(NULL);
 
-  // 計算實際花費時間
+  // ­pºâ¹ê»Úªá¶O®É¶¡
   runtime = difftime(end, start);
   WriteOutput( sorted, runtime, fileName + "_myOutput3" )  ;
-  printf( "CPU runtime:%f\n", runtime ) ;*/
+  printf( "3.CPU runtime:%f\nms", runtime ) ;
+  Cleaner.clear( sorted ) ;
   
-  //-----------------------------------------------------3 end
-  sorted.clear() ;
-  k_files = CutFiles( origin, numOfFiles ) ;
-  start = time(NULL);
+  //-----------------------------------------------------3 end*/
+  //-----------------------------------------------------4 start
+
+  // start = time(NULL);
+  start = clock() ;
+
   int i, j ;
   for ( i = 0 ; i < k_files.size() ; i++ ) {
     k_files[i] = BubbleSort( k_files[i], false ) ;
@@ -130,24 +185,32 @@ int main() {
   for ( int i = 1 ; i < k_files.size() ; i++ ) {
     sorted = Merge( sorted, k_files[i], false ) ;
   } // for()
-  // 結束計算時間
-  end = time(NULL);
+  // µ²§ô­pºâ®É¶¡
+  //end = time(NULL);
+  end = clock() ;
 
-  // 計算實際花費時間
+  // ­pºâ¹ê»Úªá¶O®É¶¡
   runtime = difftime(end, start);
   WriteOutput( sorted, runtime, fileName + "_myOutput4" )  ;
-  printf( "CPU runtime:%f\n", runtime ) ;
+  printf( "4.CPU runtime:%fms\n", runtime ) ;
   // ---------------------------------------------------4 end
+  Cleaner::clear( origin ) ;
+  Cleaner::clear( sorted ) ;
+  Cleaner::clear( k_files ) ;
+  Cleaner::clear( threads ) ;
+  Cleaner::clear( myQ ) ;
+  system( "pause\n" ) ;
+  } // while
 } // main()
 
 void ReadInput( vector<int> &arr, string &fileName ) { 
   fstream infile ;
   int buf ;
-  cout << "請輸入檔案名稱\n" ;
+  cout << "½Ð¿é¤JÀÉ®×¦WºÙ\n" ;
   cin >>  fileName ;
   infile.open( ( "\input\\" + fileName + ".txt" ).c_str(), fstream::in )  ;
   while( !infile.is_open() ) {
-	cout << "檔案名稱錯誤,重新輸入：" ;
+	cout << "ÀÉ®×¦WºÙ¿ù»~,­«·s¿é¤J¡G" ;
     cin >> fileName;
     infile.open( ( "\input\\" + fileName + ".txt" ).c_str(), fstream::in ) ;
   } //while
@@ -155,6 +218,7 @@ void ReadInput( vector<int> &arr, string &fileName ) {
   while( infile >> buf ) {
     arr.push_back( buf ) ;
   } // while 
+  infile.close() ;
 } // readInput()
 
 void WriteOutput( vector<int> arr, double  runTime, string fileName ) {
@@ -162,15 +226,15 @@ void WriteOutput( vector<int> arr, double  runTime, string fileName ) {
   tm *ltm = localtime(&now);
   fstream outfile ;
   outfile.open( ( fileName + ".txt").c_str(), fstream::out ) ;
-  outfile << "Sort：\n" ;
+  outfile << "Sort¡G\n" ;
   for ( int i = 0 ; i < arr.size() ; i++ ) {
     outfile << arr[i] << endl ; 
   } // for
 
-  outfile << "CPU Time：" << runTime << endl ;
-  outfile << "Output Time：" << 
+  outfile << "CPU Time¡G" << runTime << "ms" << endl ;
+  outfile << "Output Time¡G" << 
  
-  // 輸出 tm 結構的各個組成部分
+  // ¿é¥X tm µ²ºcªº¦U­Ó²Õ¦¨³¡¤À
   outfile << 1900 + ltm->tm_year ;
   outfile << "-"<< 1 + ltm->tm_mon ;
   outfile << "-"<<  ltm->tm_mday ;
@@ -206,12 +270,12 @@ vector<int> Merge( vector<int> leftSub, vector<int> rightSub, bool isThread ) {
   arr.resize( arrSize ) ;
 
   for ( int i = 0 ; i < arrSize ; i++ ) {
-	if ( rightIdx >= rightSize ) { // ?/0 => sorted
+	if ( rightIdx >= rightSize ) { // x/0 => sorted
 	  arr[i] = leftSub[leftIdx] ;
 	  leftIdx++ ;
 	} // else if
 
-    else if ( leftIdx >= leftSize ) { // 0/? => sorted
+    else if ( leftIdx >= leftSize ) { // x/? => sorted
       arr[i] = rightSub[rightIdx] ;
       rightIdx++ ;
 	} // if
@@ -232,6 +296,7 @@ vector<int> Merge( vector<int> leftSub, vector<int> rightSub, bool isThread ) {
   if ( isThread ) {
     myQ.push( arr ) ;
   } // if 
+
   return arr ;
 } // Merge()
 
@@ -239,7 +304,7 @@ vector< vector<int> > CutFiles( vector<int> originData, int numOfFiles ) {
   vector< vector<int> > k_files ;
   k_files.resize( numOfFiles ) ;
   int numOfIntInFile = originData.size() / numOfFiles ;
-  int numOfPlusOneInt = originData.size() - ( numOfIntInFile * numOfFiles ) ;  // 取餘數 
+  int numOfPlusOneInt = originData.size() - ( numOfIntInFile * numOfFiles ) ;  // ¨ú¾l¼Æ 
   vector<int>::iterator it = originData.begin() ;
   for ( int i = 0 ; i < numOfFiles ; i++ ) {
     if ( i < numOfPlusOneInt ) {
@@ -255,6 +320,5 @@ vector< vector<int> > CutFiles( vector<int> originData, int numOfFiles ) {
   
   return k_files ;
 } // CutFiles()
-
 
 
