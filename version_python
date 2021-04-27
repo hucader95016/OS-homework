@@ -57,23 +57,65 @@ def bubbleSort(arr):
             if arr[j] > arr[j+1] :
                 arr[j], arr[j+1] = arr[j+1], arr[j]            
 
-def ReadFile( arr ) :
-    print( 'Please Enter Input File:' )
-    fileName = input( '>' )
-    infile = open( fileName + '.txt', 'r' )
-    while not infile.isOpened() :
-        print( 'Could not find the file:', fileName )
-        print( 'Please Enter Input File:' )
-        fileName = input( '>' )
-        infile = open( fileName + '.txt', 'r' )
-            
+def ReadFile( arr, fileName ) :
+    infile = open( 'input/' + fileName + '.txt', 'r' )
     for num in infile :
         arr.append( int(num) )
-        
+								
     infile.close()
+	
 
+def OutputFile( arr, fileName, testNum ) :
+	outfile = open( fileName + '_Output' + str(testNum) + '.txt', 'w' )
+	for num in arr :
+		print( num, file = outfile )
+		
+	#outfile.write(time)
+	outfile.close()
+
+# main
 while True :
-    arr[]
-    ReadFile( arr )
-
- 
+	arr = []
+	fileName = input( 'Please Enter Input File(q to quit):\n>' )
+	if fileName == 'q' :
+		break
+	
+	ReadFile( arr, fileName )
+	k_files = input( '\n請輸入要切成幾份檔案\n>' )
+	numsInFile = int( len( arr ) / k_files )
+	sorted = arr 
+	
+    # mission 1 start
+	bubbleSort( sorted )
+	OutputFile( sorted, fileName, 1 )
+	print( '\nDone mission 1' )
+	
+	# mission 2 start
+	# mission 3 start
+	# mission 4 start
+	accmulaIndex = 0
+	nowIndex = 0
+	while True : # bubble sort
+		accmulaIndex += numsInFile
+		if accmulaIndex >= len( arr ) :
+			bubbleSort( sorted[nowIndex:len( arr )] )
+			break
+		
+		bubbleSort( sorted[nowIndex:accmulaIndex] )
+		nowIndex = accmulaIndex
+	
+	accmulaIndex = 0
+	nowIndex = 0
+	mid = 0
+	while True :
+		mid = nowIndex + numsInFile
+		accmulaIndex += mid + numsInFile
+		if accmulaIndex >= len( arr ) : 
+			mid = len(arr) - nowIndex
+			merge( sorted, nowIndex, nowIndex, mid, len(arr) )
+	
+	
+	
+	
+	
+	
