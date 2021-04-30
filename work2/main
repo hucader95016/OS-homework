@@ -1,0 +1,81 @@
+# include <stdio.h>
+# include <iostream>
+# include <vector>
+# include <fstream>
+
+using namespace std ;
+
+struct Process {
+  string pid ;
+  int cpuBrust ;
+  int arrivalTime ;
+  int priority ;
+};
+
+void ReadFile( string &fileName, vector<Process> &processList, int &method, int &timeSlice ) ;
+string IdFormat( int pid_int ) ;
+
+int main() {
+  vector<Process> processList ;
+  int method, timeSlice ;
+  string fileName ;
+
+  ReadFile( fileName, processList, method, timeSlice ) ;
+  for ( int i = 0 ; i < processList.size() ; i++ ) {
+    cout << processList[i].pid << "," ;
+    cout << processList[i].cpuBrust << "," ;
+    cout << processList[i].arrivalTime << "," ;
+    cout << processList[i].priority << endl ;
+  } // for
+} // main() 
+
+void ReadFile( string &fileName, vector<Process> &processList, int &method, int &timeSlice ) {
+  FILE *infile ;
+  char ch ;
+  int fNo1, fNo2, fNo3, fNo4 ;
+  Process process ;
+  cout << "Please enter a file\n>" ;
+  cin >> fileName ;
+  fileName = fileName + ".txt" ; 
+  infile = fopen( fileName.c_str(), "r" ) ;
+
+  while( infile == NULL ) {
+	cout << "\nError:Could not found the file\n" ;
+    cout << "Please enter again\n>" ;
+    cin >> fileName;
+	fileName = fileName + ".txt" ; 
+    infile = fopen( fileName.c_str(), "r" ) ;
+  } //while 
+
+  fscanf( infile, "%d %d", &method, &timeSlice ) ;
+  while( ch != '\n' ) { // throw not using line
+    fscanf( infile, "%c", &ch ) ;
+  } // while
+
+  int i  = 0 ;
+  while ( fscanf( infile, "%d %d %d %d", &fNo1, &fNo2, &fNo3, &fNo4 ) != EOF ) {
+    cout << i << endl ;
+    process.pid = IdFormat( fNo1 ) ;
+    process.cpuBrust = fNo2 ;
+    process.arrivalTime = fNo3 ;
+    process.priority = fNo4 ;
+    processList.push_back( process ) ;
+    i++ ;
+  } // while
+
+  fclose( infile ) ;
+} // ReadFile()
+
+string IdFormat( int pid_int ) {
+  string pid_str ;
+  if ( pid_int < 10 ) {
+    pid_str = '0' + pid_int ;
+  } // if
+
+  else {
+    pid_int -= 10 ;
+    pid_str = 'A' + pid_int ;
+  } // else
+
+  return pid_str ;
+} // IDFormat()
