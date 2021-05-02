@@ -7,6 +7,8 @@
 
 using namespace std ;
 
+int timeSlice ;
+
 struct Process {
   string pid ;
   int cpuBrust ;
@@ -17,15 +19,25 @@ struct Process {
 
 void ReadFile( string &fileName, vector<Process> &processList, int &method, int &timeSlice ) ;
 string IdFormat( int pid_int ) ;
-vector<Process> Sorting( vector<Process> processList ) ;
-vector<Process> Insertion( vector<process> processList, int key ) ;
+vector<Process> InsertionSort( vector<Process> processList ) ;
+
+class Cpu {
+  private :
+    vector<string> runningRecord ;
+  public :
+    Process running ;
+
+    ContextSwitch( Process readyProcess ) ;
+    
+} ;
 
 int main() {
   vector<Process> processList ;
-  int method, timeSlice ;
+  int method ;
   string fileName ;
 
   ReadFile( fileName, processList, method, timeSlice ) ;
+  processList = InsertionSort( processList ) ;
   for ( int i = 0 ; i < processList.size() ; i++ ) {
     cout << processList[i].pid << "," ;
     cout << processList[i].cpuBrust << "," ;
@@ -84,13 +96,33 @@ string IdFormat( int pid_int ) {
   return pid_str ;
 } // IDFormat()
 
-vector<Process> Sorting( vector<Process> processList ) {
+vector<Process> InsertionSort( vector<Process> processList ) {
+  for ( int i = 1 ; i < processList.size() ; i++ ) {
+    Process key = processList[i] ;
+    int j = i - 1 ; 
+    while( key.arrivalTime <= processList[j].arrivalTime && j >= 0 ) {
+      if ( key.arrivalTime == processList[j].arrivalTime ) {
+        if ( key.pid < processList[j].pid ) {
+          processList[j+1] = processList[j] ;
+        } // if
 
+        else {
+          break ;
+        } // else
+      } // if
+      
+      else {
+        processList[j+1] = processList[j] ;
+      } // 
+
+      j-- ;
+    } // while
+
+    processList[j+1] = key ;
+  } // for
+
+  return processList ;
 } // Sorting()
 
-vector<Process> Insertion( vector<process> processList, int key ) {
-  int i = 0 ;
-  bool insert = false ;
-  for ( i = 0 ; i < )
-} // Insertion()
+
 
