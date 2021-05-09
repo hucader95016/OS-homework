@@ -8,42 +8,64 @@
 using namespace std ;
 
 int timeSlice ;
+int timer = 0 ;
 
 struct Process {
-  string pid ;
+  char pid ;
   int cpuBrust ;
   int arrivalTime ;
   int priority ;
   int finishTime ;
+  int remainTime ;
 };
 
 void ReadFile( string &fileName, vector<Process> &processList, int &method, int &timeSlice ) ;
-string IdFormat( int pid_int ) ;
-vector<Process> InsertionSort( vector<Process> processList ) ;
+void WriteFile( string fileName, vector<Process> finishProcess, vector<char> runningRecord, int method ) ;
+char IdFormat( int pid_int ) ;
+vector<Process> InsertionSort_arrival( vector<Process> processList ) ;
+vector<Process> InsertionSort_pid( vector<Process> processList ) ;
 
 class Cpu {
   private :
-    vector<string> runningRecord ;
+    vector<char> runningRecord ;
+    Process *runningProcess ;
   public :
-    Process running ;
+    void ContextSwitch( queue<Process> &readyQueue, vector<Process> &finishProcess ) ;
+    bool IsIdle() ;
+    bool Processing() ;
+    vector<char> GetRunningRecord() {
+      return runningRecord ;
+    } // GetRunningRecord()
 
-    ContextSwitch( Process readyProcess ) ;
-    
+    void Reset() {
+      runningRecord.clear() ;
+      runningProcess = NULL ;
+    } // Reset()
 } ;
+
+Cpu cpu ;
+
+vector<Process> FCFS( vector<Process> processList ) ;
+vector<Process> RR( vector<Process> processList ) ;
+vector<Process> SRTF( vector<Process> processList ) ;
+vector<Process> PPRR( vector<Process> processList ) ;
+vector<Process> HRRN( vector<Process> processList ) ;
 
 int main() {
   vector<Process> processList ;
+  vector<Process> finishProcess ;
   int method ;
   string fileName ;
 
   ReadFile( fileName, processList, method, timeSlice ) ;
-  processList = InsertionSort( processList ) ;
-  for ( int i = 0 ; i < processList.size() ; i++ ) {
-    cout << processList[i].pid << "," ;
-    cout << processList[i].cpuBrust << "," ;
-    cout << processList[i].arrivalTime << "," ;
-    cout << processList[i].priority << endl ;
-  } // for
+  cout << "0\n" ;
+  processList = InsertionSort_arrival( processList ) ;
+  cout << "00\n" ;
+  finishProcess = FCFS( processList ) ;
+  cout << "000\n" ;
+  finishProcess = InsertionSort_pid( finishProcess ) ;
+  cout << "00000\n" ;
+  WriteFile( fileName, finishProcess, cpu.GetRunningRecord(), method ) ;
 } // main() 
 
 void ReadFile( string &fileName, vector<Process> &processList, int &method, int &timeSlice ) {
@@ -65,38 +87,106 @@ void ReadFile( string &fileName, vector<Process> &processList, int &method, int 
   } //while 
 
   fscanf( infile, "%d %d", &method, &timeSlice ) ;
-  cout << method << "," << timeSlice << endl ;
   for ( int i = 0 ; i < 6 ; i++ ) { // throw not using line
     fscanf( infile, "%s", cStr ) ;
   } // while
 
-  int i  = 0 ;
   while ( fscanf( infile, "%d %d %d %d", &fNo1, &fNo2, &fNo3, &fNo4 ) != EOF ) {
     process.pid = IdFormat( fNo1 ) ;
     process.cpuBrust = fNo2 ;
     process.arrivalTime = fNo3 ;
     process.priority = fNo4 ;
+    process.finishTime = -1 ;
+    process.remainTime = process.cpuBrust ;
     processList.push_back( process ) ;
   } // while
 
   fclose( infile ) ;
 } // ReadFile()
 
-string IdFormat( int pid_int ) {
-  string pid_str ;
+void WriteFile( string fileName, vector<Process> finishProcess, vector<char> runningRecord, int method ) {
+  FILE *infile ;
+  string methodStr ;
+  infile = fopen( ( "myout_" + fileName ).c_str(), "w" ) ;
+  if ( method == 1 ) {
+    methodStr = "FCFS" ;
+    fprintf( infile, "FCFS\n" ) ;
+  } // if
+
+  else if ( method == 2 ) {
+    methodStr = "RR" ;
+    fprintf( infile, "RR\n" ) ;
+  } // else if
+
+  else if ( method == 3 ) {
+    methodStr = "SRTF" ;
+    fprintf( infile, "SRTF\n" ) ;
+  } // else if
+
+  else if ( method == 4 ) {
+    methodStr = "PPRR" ;
+    fprintf( infile, "PPRR\n" ) ;
+  } // else if
+
+  else if ( method == 5 ) {
+    methodStr = "HRRN" ;
+    fprintf( infile, "HRRN\n" ) ;
+  } // else if
+
+  else {
+    fprintf( infile, "ALL\n" ) ;
+  } // else
+
+  fprintf( infile, "-" ) ;
+  for ( int i = 0 ; i < runningRecord.size() ; i++ ) {
+    fprintf( infile, "%c", runningRecord[i] ) ;
+  } // for
+
+  fprintf( infile, "\n===========================================================\n\n" ) ;
+  fprintf( infile, "waiting\nID %s\n", methodStr.c_str() ) ;
+  fprintf( infile, "===========================================================\n" ) ;
+  for ( int i = 0 ; i < finishProcess.size() ; i++ ) {
+    int waitingTime = finishProcess[i].finishTime - finishProcess[i].arrivalTime - finishProcess[i].cpuBrust + 1 ;
+    int pid_int ;
+    pid_int = finishProcess[i].pid - 'A' + 10 ;
+    if ( pid_int < 0 )
+      pid_int = finishProcess[i].pid - '0' ;
+
+    fprintf( infile, "%d\t%d\n", pid_int, waitingTime ) ;
+  } // for
+
+  fprintf( infile, "\n===========================================================\n\n" ) ;
+
+  fprintf( infile, "Turnaround Time\nID %s\n", methodStr.c_str() ) ;
+  fprintf( infile, "===========================================================\n" ) ;
+  for ( int i = 0 ; i < finishProcess.size() ; i++ ) {
+    int turnaround = finishProcess[i].finishTime - finishProcess[i].arrivalTime + 1 ;
+    int pid_int = finishProcess[i].pid - 'A' ;
+    if ( pid_int < 0 )
+      pid_int = finishProcess[i].pid - '0' ;
+
+    fprintf( infile, "%d\t%d\n", pid_int, turnaround ) ;
+  } // for
+
+  fclose( infile ) ;
+  cout << "Done\n" ;
+} // WriteFile
+
+char IdFormat( int pid_int ) {
+  char pid_ch ;
   if ( pid_int < 10 ) {
-    pid_str = '0' + pid_int ;
+    pid_ch = '0' + pid_int ;
   } // if
 
   else {
     pid_int -= 10 ;
-    pid_str = 'A' + pid_int ;
+    pid_ch = 'A' + pid_int ;
   } // else
 
-  return pid_str ;
+  return pid_ch ;
 } // IDFormat()
 
-vector<Process> InsertionSort( vector<Process> processList ) {
+vector<Process> InsertionSort_arrival( vector<Process> processList ) {
   for ( int i = 1 ; i < processList.size() ; i++ ) {
     Process key = processList[i] ;
     int j = i - 1 ; 
@@ -124,5 +214,119 @@ vector<Process> InsertionSort( vector<Process> processList ) {
   return processList ;
 } // Sorting()
 
+vector<Process> InsertionSort_pid( vector<Process> processList ) {
+  for ( int i = 1 ; i < processList.size() ; i++ ) {
+    Process key = processList[i] ;
+    int j = i - 1 ; 
+    while( key.pid <= processList[j].pid && j >= 0 ) {
+      processList[j+1] = processList[j] ;
+      j-- ;
+    } // while
+
+    processList[j+1] = key ;
+  } // for
+
+  return processList ;
+} // InsertionSort_pid()
+
+void Cpu :: ContextSwitch( queue<Process> &readyQueue, vector<Process> &finishProcess ) {
+  if ( runningProcess == NULL ) {
+    runningProcess = &readyQueue.front() ;
+    readyQueue.pop() ;
+  } // if
+
+  else if ( runningProcess -> remainTime == 0 ) {
+    runningProcess -> finishTime = timer ;
+    finishProcess.push_back( *runningProcess ) ;
+    if ( !readyQueue.empty() ) {
+      runningProcess = &readyQueue.front() ;
+      readyQueue.pop() ;
+    } // if
+
+    else {
+      runningProcess = NULL ;
+    } // else
+  } // if
+
+  else {
+    if ( !readyQueue.empty() ) {
+      readyQueue.push( *runningProcess ) ;
+      runningProcess = &readyQueue.front() ;
+      readyQueue.pop() ;
+    } // if
+  } // else
+} // ContextSwitch()
+
+bool Cpu :: IsIdle() {
+  if ( runningProcess == NULL )
+    return true ;
+
+  return false ;
+} // ISIdle()
+
+bool Cpu :: Processing() { 
+  // 以1個時間單位為單位 
+  // return if a process is done
+  // false if process is done, true if process still running
+  if ( runningProcess == NULL ) 
+    return false ;
+  
+  else {
+    runningRecord.push_back( runningProcess -> pid ) ;
+    ( runningProcess -> remainTime )-- ;
+    if ( runningProcess -> remainTime == 0 ) 
+      return false ;
+
+    return true ;
+  } // else
+} // Processing()
+
+vector<Process> FCFS( vector<Process> processList ) {
+  int processIndex = 0 ;
+  bool done = false ;
+  queue<Process> readyQueue ;
+  vector<Process> finishProcess ;
+
+  while ( processList[processIndex].arrivalTime == timer ) {
+    readyQueue.push( processList[processIndex] ) ;
+    processIndex++ ;
+  } // while
+
+  cpu.ContextSwitch( readyQueue, finishProcess ) ;
+  timer++ ;
+
+  while ( processIndex < processList.size() || !cpu.IsIdle() ) {
+    while ( processList[processIndex].arrivalTime == timer ) {
+      readyQueue.push( processList[processIndex] ) ;
+      processIndex++ ;
+    } // while
+
+    done = !cpu.Processing() ;
+    if ( done ) {
+      cpu.ContextSwitch( readyQueue, finishProcess ) ;
+      done = false ;
+    } // if
+
+    timer++ ;
+  } // while
+
+  return finishProcess ;
+} // FCFS()
+
+vector<Process> RR( vector<Process> processList ) {
+
+} // RR()
+
+vector<Process> SRTF( vector<Process> processList ) {
+
+} // SRTF()
+
+vector<Process> PPRR( vector<Process> processList ) {
+
+} // PPRR()
+
+vector<Process> HRRN( vector<Process> processList ) {
+
+} // HRRN()
 
 
