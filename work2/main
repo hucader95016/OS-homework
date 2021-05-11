@@ -157,7 +157,7 @@ void WriteFile( string fileName, vector<Process> finishProcess, vector<char> run
     fprintf( infile, "ALL\n" ) ;
   } // else
 
-  fprintf( infile, "-" ) ;
+  //fprintf( infile, "-" ) ; -------------------------------------bug
   for ( int i = 0 ; i < runningRecord.size() ; i++ ) {
     fprintf( infile, "%c", runningRecord[i] ) ;
   } // for
@@ -328,7 +328,7 @@ vector<Process> FCFS( vector<Process> processList ) {
   queue<Process> readyQueue ;
   vector<Process> finishProcess ;
 
-  while ( processList[processIndex].arrivalTime == timer ) {
+  while ( processIndex < processList.size() && processList[processIndex].arrivalTime == timer ) {
     readyQueue.push( processList[processIndex] ) ;
     processIndex++ ;
   } // while
@@ -339,13 +339,15 @@ vector<Process> FCFS( vector<Process> processList ) {
   timer++ ;
 
   while ( processIndex < processList.size() || !cpu.IsIdle() ) {
-    while ( processList[processIndex].arrivalTime == timer ) {
+    while ( processIndex < processList.size() && processList[processIndex].arrivalTime == timer ) {
       readyQueue.push( processList[processIndex] ) ;
       processIndex++ ;
     } // while
 
-    if ( !cpu.IsIdle() )
-      done = !cpu.Processing() ;
+    done = !cpu.Processing() ;
+    if ( cpu.IsIdle() && !readyQueue.empty() ) {
+      cpu.ContextSwitch( readyQueue, finishProcess ) ;
+    } // if
 
     if ( done ) {
       cpu.ContextSwitch( readyQueue, finishProcess ) ;
@@ -365,7 +367,7 @@ vector<Process> RR( vector<Process> processList ) {
   queue<Process> readyQueue ;
   vector<Process> finishProcess ;
 
-  while ( processList[processIndex].arrivalTime == timer ) {
+  while ( processIndex < processList.size() && processList[processIndex].arrivalTime == timer ) {
     readyQueue.push( processList[processIndex] ) ;
     processIndex++ ;
   } // while
@@ -378,13 +380,16 @@ vector<Process> RR( vector<Process> processList ) {
   timer++ ;
 
   while ( processIndex < processList.size() || !cpu.IsIdle() ) {
-    while ( processList[processIndex].arrivalTime == timer ) {
+    while ( processIndex < processList.size() && processList[processIndex].arrivalTime == timer ) {
       readyQueue.push( processList[processIndex] ) ;
       processIndex++ ;
     } // while
 
-    if ( !cpu.IsIdle() )
-      done = !cpu.Processing() ;
+    done = !cpu.Processing() ;
+    if ( cpu.IsIdle() && !readyQueue.empty() ) {
+      cpu.ContextSwitch( readyQueue, finishProcess ) ;
+    } // else
+
     if ( done || timeSliceCounter == gTimeSlice) {
       cpu.ContextSwitch( readyQueue, finishProcess ) ;
       done = false ;
@@ -404,7 +409,7 @@ vector<Process> SRTF( vector<Process> processList ) {
   vector<Process> readyQueue ;
   vector<Process> finishProcess ;
 
-  while ( processList[processIndex].arrivalTime == timer ) {
+  while ( processIndex < processList.size() && processList[processIndex].arrivalTime == timer ) {
     readyQueue.push_back( processList[processIndex] ) ;
     processIndex++ ;
   } // while
@@ -419,17 +424,21 @@ vector<Process> SRTF( vector<Process> processList ) {
   timer++ ;
 
   while ( processIndex < processList.size() || !cpu.IsIdle() ) { // SRTF
-    cout << timer << endl ;
-    bool isSR = false ;
-    while ( processList[processIndex].arrivalTime == timer ) {
+    bool isSR = true ;
+    while ( processIndex < processList.size() && processList[processIndex].arrivalTime == timer ) {
       readyQueue.push_back( processList[processIndex] ) ;
       processIndex++ ;
     } // while
 
-    if ( !cpu.IsIdle() )
-      done = !cpu.Processing() ;
-
     readyQueue = InsertionSort_remain( readyQueue ) ;
+    done = !cpu.Processing() ;
+    /*if ( cpu.IsIdle() && !readyQueue.empty() ) {
+      cpu.ContextSwitch( readyQueue, finishProcess ) ;
+      isSR = true ;
+    } // if
+
+    else if ( !cpu.IsIdle() && !readyQueue.empty() )
+      isSR = IsSR( cpu.GetRunningProcessInfo(), readyQueue[0] ) ;*/
     if ( !cpu.IsIdle() && !readyQueue.empty() )
       isSR = IsSR( cpu.GetRunningProcessInfo(), readyQueue[0] ) ;
 
@@ -520,11 +529,13 @@ bool Cpu :: IsIdle() {
 } // ISIdle()
 
 bool Cpu :: Processing() { 
-  // ¥H1­Ó®É¶¡³æ¦ì¬°³æ¦ì 
+  // 以1個時間單位為單位 
   // return if a process is done
   // false if process is done, true if process still running
-  if ( runningProcess == NULL ) 
+  if ( runningProcess == NULL ) {
+    runningRecord.push_back( '-' ) ;
     return false ;
+  } // if
   
   else {
     runningRecord.push_back( runningProcess -> pid ) ;
