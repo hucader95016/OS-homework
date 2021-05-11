@@ -22,8 +22,10 @@ struct Process {
 void ReadFile( string &fileName, vector<Process> &processList, int &method, int &gTimeSlice ) ;
 void WriteFile( string fileName, vector<Process> finishProcess, vector<char> runningRecord, int method ) ;
 char IdFormat( int pid_int ) ;
+bool IsSR( Process running, Process waiting ) ;
 vector<Process> InsertionSort_arrival( vector<Process> processList ) ;
 vector<Process> InsertionSort_pid( vector<Process> processList ) ;
+vector<Process> InsertionSort_remain( vector<Process> processList ) ;
 
 class Cpu {
   private :
@@ -31,6 +33,7 @@ class Cpu {
     Process *runningProcess ;
   public :
     void ContextSwitch( queue<Process> &readyQueue, vector<Process> &finishProcess ) ;
+    void ContextSwitch( vector<Process> &readyQueue, vector<Process> &finishProcess ) ;
     bool IsIdle() ;
     bool Processing() ;
     vector<char> GetRunningRecord() {
@@ -41,6 +44,17 @@ class Cpu {
       runningRecord.clear() ;
       runningProcess = NULL ;
     } // Reset()
+
+    Process GetRunningProcessInfo() {
+      Process temp ;
+      temp.arrivalTime = runningProcess -> arrivalTime ;
+      temp.cpuBrust = runningProcess -> cpuBrust ;
+      temp.finishTime = runningProcess -> finishTime ;
+      temp.pid = runningProcess -> pid ;
+      temp.priority = runningProcess -> priority ;
+      temp.remainTime = runningProcess -> remainTime ;
+      return temp ;
+    } // GetRunningProcessRemain()
 } ;
 
 Cpu cpu ;
@@ -63,9 +77,9 @@ int main() {
     finishProcess = FCFS( processList ) ;
   else if ( method == 2 )
     finishProcess = RR( processList ) ;
-  /*else if ( method == 3 )
+  else if ( method == 3 )
     finishProcess = SRTF( processList ) ;
-  else if ( method == 4 )
+  /*else if ( method == 4 )
     finishProcess = PPRR( processList ) ;
   else if ( method == 5 )
     finishProcess = HRRN( processList ) ;*/
@@ -218,7 +232,7 @@ vector<Process> InsertionSort_arrival( vector<Process> processList ) {
   } // for
 
   return processList ;
-} // Sorting()
+} // InsertionSort_arrival
 
 vector<Process> InsertionSort_pid( vector<Process> processList ) {
   for ( int i = 1 ; i < processList.size() ; i++ ) {
@@ -235,57 +249,78 @@ vector<Process> InsertionSort_pid( vector<Process> processList ) {
   return processList ;
 } // InsertionSort_pid()
 
-void Cpu :: ContextSwitch( queue<Process> &readyQueue, vector<Process> &finishProcess ) {
-  if ( runningProcess == NULL ) {
-    runningProcess = &readyQueue.front() ;
-    readyQueue.pop() ;
-  } // if
+vector<Process> InsertionSort_remain( vector<Process> processList ) {
+  for ( int i = 1 ; i < processList.size() ; i++ ) {
+    Process key = processList[i] ;
+    int j = i - 1 ; 
+    while( key.remainTime <= processList[j].remainTime && j >= 0 ) {
+      if ( key.remainTime == processList[j].remainTime ) {
+        if ( key.arrivalTime <= processList[j].arrivalTime ) {
+          if ( key.arrivalTime == processList[j].arrivalTime ) {
+            if ( key.pid < processList[j].pid ) {
+              processList[j+1] = processList[j] ;
+              j-- ;
+            } // if
 
-  else if ( runningProcess -> remainTime == 0 ) {
-    runningProcess -> finishTime = timer ;
-    finishProcess.push_back( *runningProcess ) ;
-    if ( !readyQueue.empty() ) {
-      runningProcess = &readyQueue.front() ;
-      readyQueue.pop() ;
+            else {
+              break ; // not sure
+            } // else
+          } // if
+
+          else { // arrivalTime:key<now
+            processList[j+1] = processList[j] ;
+            j-- ;
+          } // else
+        } // if
+
+        else {
+          break ;
+        } // else
+      } // if
+
+      else {
+        processList[j+1] = processList[j] ;
+        j-- ;
+      } // else
+    } // while
+
+    processList[j+1] = key ;
+  } // for
+
+  return processList ;
+} // InsertionSort_remain()
+
+bool IsSR( Process running, Process waiting ) {
+  if ( running.remainTime <= waiting.remainTime ) {
+    if ( running.remainTime == waiting.remainTime ) {
+      if ( running.arrivalTime <= waiting.arrivalTime ) {
+        if ( running.arrivalTime == waiting.arrivalTime ) {
+          if ( running.pid < waiting.pid ) {
+            return true ;
+          } // if
+
+          else
+            return false ;
+        } // if
+
+        else {
+          return true ;
+        } // else
+      } // if
+
+      else {
+        return false ;
+      } // else
     } // if
 
     else {
-      runningProcess = NULL ;
+      return true ;
     } // else
   } // if
 
-  else {
-    if ( !readyQueue.empty() ) {
-      readyQueue.push( *runningProcess ) ;
-      runningProcess = &readyQueue.front() ;
-      readyQueue.pop() ;
-    } // if
-  } // else
-} // ContextSwitch()
-
-bool Cpu :: IsIdle() {
-  if ( runningProcess == NULL )
-    return true ;
-
-  return false ;
-} // ISIdle()
-
-bool Cpu :: Processing() { 
-  // 以1個時間單位為單位 
-  // return if a process is done
-  // false if process is done, true if process still running
-  if ( runningProcess == NULL ) 
+  else
     return false ;
-  
-  else {
-    runningRecord.push_back( runningProcess -> pid ) ;
-    ( runningProcess -> remainTime )-- ;
-    if ( runningProcess -> remainTime == 0 ) 
-      return false ;
-
-    return true ;
-  } // else
-} // Processing()
+} // IsSR
 
 vector<Process> FCFS( vector<Process> processList ) {
   int processIndex = 0 ;
@@ -309,7 +344,9 @@ vector<Process> FCFS( vector<Process> processList ) {
       processIndex++ ;
     } // while
 
-    done = !cpu.Processing() ;
+    if ( !cpu.IsIdle() )
+      done = !cpu.Processing() ;
+
     if ( done ) {
       cpu.ContextSwitch( readyQueue, finishProcess ) ;
       done = false ;
@@ -346,7 +383,8 @@ vector<Process> RR( vector<Process> processList ) {
       processIndex++ ;
     } // while
 
-    done = !cpu.Processing() ;
+    if ( !cpu.IsIdle() )
+      done = !cpu.Processing() ;
     if ( done || timeSliceCounter == gTimeSlice) {
       cpu.ContextSwitch( readyQueue, finishProcess ) ;
       done = false ;
@@ -362,25 +400,46 @@ vector<Process> RR( vector<Process> processList ) {
 
 vector<Process> SRTF( vector<Process> processList ) {
   int processIndex = 0 ;
-  int timeSliceCounter = 0 ;
   bool done = false ;
   vector<Process> readyQueue ;
   vector<Process> finishProcess ;
 
   while ( processList[processIndex].arrivalTime == timer ) {
-    readyQueue.push( processList[processIndex] ) ;
+    readyQueue.push_back( processList[processIndex] ) ;
     processIndex++ ;
   } // while
 
+  readyQueue = InsertionSort_remain( readyQueue ) ;
+
   if ( !readyQueue.empty() ) {
     cpu.ContextSwitch( readyQueue, finishProcess ) ;
-    timeSliceCounter++ ;
+    readyQueue = InsertionSort_remain( readyQueue ) ;
   } // if
 
   timer++ ;
 
-  while ( processIndex < processList.size() || !cpu.IsIdle() ) {
-    
+  while ( processIndex < processList.size() || !cpu.IsIdle() ) { // SRTF
+    cout << timer << endl ;
+    bool isSR = false ;
+    while ( processList[processIndex].arrivalTime == timer ) {
+      readyQueue.push_back( processList[processIndex] ) ;
+      processIndex++ ;
+    } // while
+
+    if ( !cpu.IsIdle() )
+      done = !cpu.Processing() ;
+
+    readyQueue = InsertionSort_remain( readyQueue ) ;
+    if ( !cpu.IsIdle() && !readyQueue.empty() )
+      isSR = IsSR( cpu.GetRunningProcessInfo(), readyQueue[0] ) ;
+
+    if ( done || !isSR ) {
+      cpu.ContextSwitch( readyQueue, finishProcess ) ;
+      done = false ;
+      readyQueue = InsertionSort_remain( readyQueue ) ;
+    } // if
+
+    timer++ ;
   } // while
 
   return finishProcess ;
@@ -394,4 +453,85 @@ vector<Process> HRRN( vector<Process> processList ) {
 
 } // HRRN()
 
+void Cpu :: ContextSwitch( queue<Process> &readyQueue, vector<Process> &finishProcess ) {
+  if ( runningProcess == NULL ) {
+    runningProcess = &readyQueue.front() ;
+    readyQueue.pop() ;
+  } // if
 
+  else if ( runningProcess -> remainTime == 0 ) {
+    runningProcess -> finishTime = timer ;
+    finishProcess.push_back( *runningProcess ) ;
+    if ( !readyQueue.empty() ) {
+      runningProcess = &readyQueue.front() ;
+      readyQueue.pop() ;
+    } // if
+
+    else {
+      runningProcess = NULL ;
+    } // else
+  } // if
+
+  else {
+    if ( !readyQueue.empty() ) {
+      readyQueue.push( *runningProcess ) ;
+      runningProcess = &readyQueue.front() ;
+      readyQueue.pop() ;
+    } // if
+  } // else
+} // ContextSwitch()
+
+void Cpu :: ContextSwitch( vector<Process> &readyQueue, vector<Process> &finishProcess ) {
+  if ( runningProcess == NULL ) {
+    swap( readyQueue[0], readyQueue[readyQueue.size()-1] ) ;
+    runningProcess = &readyQueue[readyQueue.size()-1] ; 
+    readyQueue.pop_back() ;
+  } // if
+
+  else if ( runningProcess -> remainTime == 0 ) {
+    runningProcess -> finishTime = timer ;
+    finishProcess.push_back( *runningProcess ) ;
+    if ( !readyQueue.empty() ) {
+      swap( readyQueue[0], readyQueue[readyQueue.size()-1] ) ;
+      runningProcess = &readyQueue[readyQueue.size()-1] ; 
+      readyQueue.pop_back() ;
+    } // if
+
+    else {
+      runningProcess = NULL ;
+    } // else
+  } // if
+
+  else {
+    if ( !readyQueue.empty() ) {
+      readyQueue.push_back( *runningProcess ) ;
+      swap( readyQueue[0], readyQueue[readyQueue.size()-1] ) ;
+      runningProcess = &readyQueue[readyQueue.size()-1] ; 
+      readyQueue.pop_back() ;
+    } // if
+  } // else
+} // ContextSwitch()
+
+bool Cpu :: IsIdle() {
+  if ( runningProcess == NULL )
+    return true ;
+
+  return false ;
+} // ISIdle()
+
+bool Cpu :: Processing() { 
+  // ¥H1­Ó®É¶¡³æ¦ì¬°³æ¦ì 
+  // return if a process is done
+  // false if process is done, true if process still running
+  if ( runningProcess == NULL ) 
+    return false ;
+  
+  else {
+    runningRecord.push_back( runningProcess -> pid ) ;
+    ( runningProcess -> remainTime )-- ;
+    if ( runningProcess -> remainTime == 0 ) 
+      return false ;
+
+    return true ;
+  } // else
+} // Processing()
