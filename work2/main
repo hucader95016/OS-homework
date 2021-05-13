@@ -17,15 +17,19 @@ struct Process {
   int priority ;
   int finishTime ;
   int remainTime ;
+  float responseRatio ;
 };
 
 void ReadFile( string &fileName, vector<Process> &processList, int &method, int &gTimeSlice ) ;
 void WriteFile( string fileName, vector<Process> finishProcess, vector<char> runningRecord, int method ) ;
 char IdFormat( int pid_int ) ;
 bool IsSR( Process running, Process waiting ) ;
+bool IsSRR( Process running, Process waiting ) ;
+float CalResponseRatio( Process process ) ;
 vector<Process> InsertionSort_arrival( vector<Process> processList ) ;
 vector<Process> InsertionSort_pid( vector<Process> processList ) ;
 vector<Process> InsertionSort_remain( vector<Process> processList ) ;
+vector<Process> InsertionSort_responseRatio( vector<Process> processList ) ;
 
 class Cpu {
   private :
@@ -58,6 +62,7 @@ class Cpu {
 } ;
 
 Cpu cpu ;
+Process gTempP ; 
 
 vector<Process> FCFS( vector<Process> processList ) ;
 vector<Process> RR( vector<Process> processList ) ;
@@ -66,6 +71,7 @@ vector<Process> PPRR( vector<Process> processList ) ;
 vector<Process> HRRN( vector<Process> processList ) ;
 
 int main() {
+  cpu.Reset() ;
   vector<Process> processList ;
   vector<Process> finishProcess ;
   int method ;
@@ -80,9 +86,9 @@ int main() {
   else if ( method == 3 )
     finishProcess = SRTF( processList ) ;
   /*else if ( method == 4 )
-    finishProcess = PPRR( processList ) ;
+    finishProcess = PPRR( processList ) ;*/
   else if ( method == 5 )
-    finishProcess = HRRN( processList ) ;*/
+    finishProcess = HRRN( processList ) ;
 
   finishProcess = InsertionSort_pid( finishProcess ) ;
   WriteFile( fileName, finishProcess, cpu.GetRunningRecord(), method ) ;
@@ -118,6 +124,7 @@ void ReadFile( string &fileName, vector<Process> &processList, int &method, int 
     process.priority = fNo4 ;
     process.finishTime = -1 ;
     process.remainTime = process.cpuBrust ;
+    process.responseRatio = 1 ;
     processList.push_back( process ) ;
   } // while
 
@@ -290,6 +297,47 @@ vector<Process> InsertionSort_remain( vector<Process> processList ) {
   return processList ;
 } // InsertionSort_remain()
 
+vector<Process> InsertionSort_responseRatio( vector<Process> processList ) {
+  for ( int i = 1 ; i < processList.size() ; i++ ) {
+    Process key = processList[i] ;
+    int j = i - 1 ; 
+    while( key.responseRatio <= processList[j].responseRatio && j >= 0 ) {
+      if ( key.responseRatio == processList[j].responseRatio ) {
+        if ( key.arrivalTime <= processList[j].arrivalTime ) {
+          if ( key.arrivalTime == processList[j].arrivalTime ) {
+            if ( key.pid < processList[j].pid ) {
+              processList[j+1] = processList[j] ;
+              j-- ;
+            } // if
+
+            else {
+              break ; // not sure
+            } // else
+          } // if
+
+          else { // arrivalTime:key<now
+            processList[j+1] = processList[j] ;
+            j-- ;
+          } // else
+        } // if
+
+        else {
+          break ;
+        } // else
+      } // if
+
+      else {
+        processList[j+1] = processList[j] ;
+        j-- ;
+      } // else
+    } // while
+
+    processList[j+1] = key ;
+  } // for
+
+  return processList ;
+} // InsertionSort_responseRatio()
+
 bool IsSR( Process running, Process waiting ) {
   if ( running.remainTime <= waiting.remainTime ) {
     if ( running.remainTime == waiting.remainTime ) {
@@ -321,6 +369,43 @@ bool IsSR( Process running, Process waiting ) {
   else
     return false ;
 } // IsSR
+
+bool IsSRR( Process running, Process waiting ) {
+  if ( running.responseRatio <= waiting.responseRatio ) {
+    if ( running.responseRatio == waiting.responseRatio ) {
+      if ( running.arrivalTime <= waiting.arrivalTime ) {
+        if ( running.arrivalTime == waiting.arrivalTime ) {
+          if ( running.pid < waiting.pid ) {
+            return true ;
+          } // if
+
+          else
+            return false ;
+        } // if
+
+        else {
+          return true ;
+        } // else
+      } // if
+
+      else {
+        return false ;
+      } // else
+    } // if
+
+    else {
+      return true ;
+    } // else
+  } // if
+
+  else
+    return false ;
+} // IsSRR()
+
+float CalResponseRatio( Process process ) {
+  int waiting = timer - process.arrivalTime - ( process.cpuBrust - process.remainTime ) ;
+  return waiting / process.cpuBrust + 1 ;
+} // CalResponseRatio()
 
 vector<Process> FCFS( vector<Process> processList ) {
   int processIndex = 0 ;
@@ -432,13 +517,7 @@ vector<Process> SRTF( vector<Process> processList ) {
 
     readyQueue = InsertionSort_remain( readyQueue ) ;
     done = !cpu.Processing() ;
-    /*if ( cpu.IsIdle() && !readyQueue.empty() ) {
-      cpu.ContextSwitch( readyQueue, finishProcess ) ;
-      isSR = true ;
-    } // if
-
-    else if ( !cpu.IsIdle() && !readyQueue.empty() )
-      isSR = IsSR( cpu.GetRunningProcessInfo(), readyQueue[0] ) ;*/
+    
     if ( !cpu.IsIdle() && !readyQueue.empty() )
       isSR = IsSR( cpu.GetRunningProcessInfo(), readyQueue[0] ) ;
 
@@ -459,13 +538,63 @@ vector<Process> PPRR( vector<Process> processList ) {
 } // PPRR()
 
 vector<Process> HRRN( vector<Process> processList ) {
+  int processIndex = 0 ;
+  bool done = false ;
+  vector<Process> readyQueue ;
+  vector<Process> finishProcess ;
 
+  while ( processIndex < processList.size() && processList[processIndex].arrivalTime == timer ) {
+    readyQueue.push_back( processList[processIndex] ) ;
+    processIndex++ ;
+  } // while
+
+  readyQueue = InsertionSort_responseRatio( readyQueue ) ;
+
+  if ( !readyQueue.empty() ) {
+    cpu.ContextSwitch( readyQueue, finishProcess ) ;
+    readyQueue = InsertionSort_responseRatio( readyQueue ) ;
+  } // if
+
+  timer++ ;
+
+  while ( processIndex < processList.size() || !cpu.IsIdle() ) { // HRRN
+    done = !cpu.Processing() ;
+    while ( processIndex < processList.size() && processList[processIndex].arrivalTime == timer ) {
+      readyQueue.push_back( processList[processIndex] ) ;
+      processIndex++ ;
+    } // while
+
+    /*if ( cpu.IsIdle() ) {
+      for ( int i = 0 ; i < readyQueue.size() ; i++ ) {
+        readyQueue[i].responseRatio = CalResponseRatio( readyQueue[i] ) ;
+      } // for
+
+      readyQueue = InsertionSort_responseRatio( readyQueue ) ;
+      cpu.ContextSwitch( readyQueue, finishProcess ) ;
+    } // if */
+    
+    if ( done ) {
+      for ( int i = 0 ; i < readyQueue.size() ; i++ ) {
+        readyQueue[i].responseRatio = CalResponseRatio( readyQueue[i] ) ;
+      } // for
+
+      readyQueue = InsertionSort_responseRatio( readyQueue ) ;
+      cpu.ContextSwitch( readyQueue, finishProcess ) ;
+      done = false ;
+    } // if
+
+    timer++ ;
+  } // while
+
+  return finishProcess ;
 } // HRRN()
 
 void Cpu :: ContextSwitch( queue<Process> &readyQueue, vector<Process> &finishProcess ) {
   if ( runningProcess == NULL ) {
-    runningProcess = &readyQueue.front() ;
-    readyQueue.pop() ;
+    if ( !readyQueue.empty() ) {
+      runningProcess = &readyQueue.front() ;
+      readyQueue.pop() ;
+    } // if
   } // if
 
   else if ( runningProcess -> remainTime == 0 ) {
@@ -492,17 +621,23 @@ void Cpu :: ContextSwitch( queue<Process> &readyQueue, vector<Process> &finishPr
 
 void Cpu :: ContextSwitch( vector<Process> &readyQueue, vector<Process> &finishProcess ) {
   if ( runningProcess == NULL ) {
-    swap( readyQueue[0], readyQueue[readyQueue.size()-1] ) ;
-    runningProcess = &readyQueue[readyQueue.size()-1] ; 
-    readyQueue.pop_back() ;
+    if ( !readyQueue.empty() ) {
+      gTempP = readyQueue[0] ;
+      runningProcess = &gTempP ;
+      swap( readyQueue[0], readyQueue[readyQueue.size()-1] ) ;
+      //runningProcess = &readyQueue[readyQueue.size()-1] ; 
+      readyQueue.pop_back() ;
+    } // if
   } // if
 
   else if ( runningProcess -> remainTime == 0 ) {
     runningProcess -> finishTime = timer ;
     finishProcess.push_back( *runningProcess ) ;
     if ( !readyQueue.empty() ) {
+      gTempP = readyQueue[0] ;
+      runningProcess = &gTempP ;
       swap( readyQueue[0], readyQueue[readyQueue.size()-1] ) ;
-      runningProcess = &readyQueue[readyQueue.size()-1] ; 
+      //runningProcess = &readyQueue[readyQueue.size()-1] ; 
       readyQueue.pop_back() ;
     } // if
 
@@ -514,8 +649,10 @@ void Cpu :: ContextSwitch( vector<Process> &readyQueue, vector<Process> &finishP
   else {
     if ( !readyQueue.empty() ) {
       readyQueue.push_back( *runningProcess ) ;
+      gTempP = readyQueue[0] ;
+      runningProcess = &gTempP ;
       swap( readyQueue[0], readyQueue[readyQueue.size()-1] ) ;
-      runningProcess = &readyQueue[readyQueue.size()-1] ; 
+      //runningProcess = &readyQueue[readyQueue.size()-1] ; 
       readyQueue.pop_back() ;
     } // if
   } // else
