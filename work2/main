@@ -4,6 +4,7 @@
 # include <fstream>
 # include <windows.h>
 # include <queue>
+#include <algorithm>
 
 using namespace std ;
 
@@ -22,14 +23,16 @@ struct Process {
 
 void ReadFile( string &fileName, vector<Process> &processList, int &method, int &gTimeSlice ) ;
 void WriteFile( string fileName, vector<Process> finishProcess, vector<char> runningRecord, int method ) ;
+void WriteFile( string fileName, vector<Process> finishProcessList[5], vector<char> runningRecordList[5] ) ;
 char IdFormat( int pid_int ) ;
 bool IsSR( Process running, Process waiting ) ;
-bool IsSRR( Process running, Process waiting ) ;
+bool IsHighPriority( Process running, Process waiting ) ;
 float CalResponseRatio( Process process ) ;
 vector<Process> InsertionSort_arrival( vector<Process> processList ) ;
 vector<Process> InsertionSort_pid( vector<Process> processList ) ;
 vector<Process> InsertionSort_remain( vector<Process> processList ) ;
 vector<Process> InsertionSort_responseRatio( vector<Process> processList ) ;
+vector<Process> InsertionSort_priority( vector<Process> processList ) ;
 
 class Cpu {
   private :
@@ -85,13 +88,55 @@ int main() {
     finishProcess = RR( processList ) ;
   else if ( method == 3 )
     finishProcess = SRTF( processList ) ;
-  /*else if ( method == 4 )
-    finishProcess = PPRR( processList ) ;*/
+  else if ( method == 4 )
+    finishProcess = PPRR( processList ) ;
   else if ( method == 5 )
     finishProcess = HRRN( processList ) ;
+  else {
+    vector<Process> finishProcessList[5] ;
+    vector<char> runningRecordList[5] ;
+    for ( int i = 0 ; i < 5 ; i++ ) {
+      if ( i == 0 ) {
+        finishProcessList[i] = FCFS( processList ) ;
+        runningRecordList[i] = cpu.GetRunningRecord() ;
+        finishProcessList[i] = InsertionSort_pid( finishProcessList[i] ) ;
+      } // if 
 
-  finishProcess = InsertionSort_pid( finishProcess ) ;
-  WriteFile( fileName, finishProcess, cpu.GetRunningRecord(), method ) ;
+      else if ( i == 1 ) {
+        finishProcessList[i] = RR( processList ) ;
+        runningRecordList[i] = cpu.GetRunningRecord() ;
+        finishProcessList[i] = InsertionSort_pid( finishProcessList[i] ) ;
+      } // else if
+
+      else if ( i == 2 ) {
+        finishProcessList[i] = SRTF( processList ) ;
+        runningRecordList[i] = cpu.GetRunningRecord() ;
+        finishProcessList[i] = InsertionSort_pid( finishProcessList[i] ) ;
+      } // else if
+     
+      else if ( i == 3 ) {
+        finishProcessList[i] = PPRR( processList ) ;
+        runningRecordList[i] = cpu.GetRunningRecord() ;
+        finishProcessList[i] = InsertionSort_pid( finishProcessList[i] ) ;
+      } // else if
+    
+      else if ( i == 4 ) {
+        finishProcessList[i] = HRRN( processList ) ;
+        runningRecordList[i] = cpu.GetRunningRecord() ;
+        finishProcessList[i] = InsertionSort_pid( finishProcessList[i] ) ;
+      } // else if
+
+      cpu.Reset() ;
+      timer = 0 ;
+    } // for
+
+    WriteFile( fileName, finishProcessList, runningRecordList ) ;
+  } // else
+
+  if ( method != 6 ) {
+    finishProcess = InsertionSort_pid( finishProcess ) ;
+    WriteFile( fileName, finishProcess, cpu.GetRunningRecord(), method ) ;
+  } // if
 } // main() 
 
 void ReadFile( string &fileName, vector<Process> &processList, int &method, int &gTimeSlice ) {
@@ -164,13 +209,12 @@ void WriteFile( string fileName, vector<Process> finishProcess, vector<char> run
     fprintf( infile, "ALL\n" ) ;
   } // else
 
-  //fprintf( infile, "-" ) ; -------------------------------------bug
   for ( int i = 0 ; i < runningRecord.size() ; i++ ) {
     fprintf( infile, "%c", runningRecord[i] ) ;
   } // for
 
   fprintf( infile, "\n===========================================================\n\n" ) ;
-  fprintf( infile, "waiting\nID %s\n", methodStr.c_str() ) ;
+  fprintf( infile, "waiting\nID\t%s\n", methodStr.c_str() ) ;
   fprintf( infile, "===========================================================\n" ) ;
   for ( int i = 0 ; i < finishProcess.size() ; i++ ) {
     int waitingTime = finishProcess[i].finishTime - finishProcess[i].arrivalTime - finishProcess[i].cpuBrust ;
@@ -184,7 +228,7 @@ void WriteFile( string fileName, vector<Process> finishProcess, vector<char> run
 
   fprintf( infile, "===========================================================\n\n" ) ;
 
-  fprintf( infile, "Turnaround Time\nID %s\n", methodStr.c_str() ) ;
+  fprintf( infile, "Turnaround Time\nID\t%s\n", methodStr.c_str() ) ;
   fprintf( infile, "===========================================================\n" ) ;
   for ( int i = 0 ; i < finishProcess.size() ; i++ ) {
     int turnaround = finishProcess[i].finishTime - finishProcess[i].arrivalTime ;
@@ -198,6 +242,86 @@ void WriteFile( string fileName, vector<Process> finishProcess, vector<char> run
   fclose( infile ) ;
   cout << "Done\n" ;
 } // WriteFile
+
+void WriteFile( string fileName, vector<Process> finishProcessList[5], vector<char> runningRecordList[5] ) {
+  FILE *infile ;
+  string methodStr ;
+  infile = fopen( ( "myout_" + fileName ).c_str(), "w" ) ;
+  fprintf( infile, "All\n" ) ;
+
+  for ( int i = 0 ; i < 5 ; i++ ) {
+    switch ( i ) {
+      case 0 :
+        fprintf( infile, "==        FCFS==\n" ) ;
+        break ;
+      case 1 :
+        fprintf( infile, "==          RR==\n" ) ;
+        break ;
+      case 2 :
+        fprintf( infile, "==        SRTF==\n" ) ;
+        break ;
+      case 3 :
+        fprintf( infile, "==        PPRR==\n" ) ;
+        break ;
+      case 4 :
+        fprintf( infile, "==        HRRN==\n" ) ;
+        break ;
+      default: 
+        cout << "bug\n" ;
+        break ;
+    } // switch
+
+    for ( int j = 0 ; j < runningRecordList[i].size() ; j++ ) {
+      fprintf( infile, "%c", runningRecordList[i][j] ) ;
+    } // for
+
+    fprintf( infile, "\n" ) ;
+  } // for
+
+  fprintf( infile, "===========================================================\n\n" ) ;
+  fprintf( infile, "waiting\nID\tFCFS\tRR\tSRTF\tPPRR\tHRRN\n" ) ;
+  fprintf( infile, "===========================================================\n" ) ;
+  for ( int i = 0 ; i < finishProcessList[0].size() ; i++ ) { // waiting time
+    int pid_int ;
+    pid_int = finishProcessList[0][i].pid - 'A' + 10 ;
+    if ( pid_int < 10 )
+      pid_int = finishProcessList[0][i].pid - '0' ;
+
+    fprintf( infile, "%d%", pid_int ) ;
+    for ( int j = 0 ; j < 5 ; j++ ) {
+      int waitingTime = finishProcessList[j][i].finishTime - finishProcessList[j][i].arrivalTime - finishProcessList[j][i].cpuBrust ;
+      fprintf( infile, "\t%d", waitingTime ) ;
+    } // for
+
+    if ( i < finishProcessList[0].size()-1 )
+      fprintf( infile, "\n" ) ;
+  } // for
+
+  fprintf( infile, "\n===========================================================\n\n" ) ;
+  fprintf( infile, "Turnaround Time\nID\tFCFS\tRR\tSRTF\tPPRR\tHRRN\n" ) ;
+  fprintf( infile, "===========================================================\n" ) ;
+
+  for ( int i = 0 ; i < finishProcessList[0].size() ; i++ ) { // turnaround time
+    int pid_int ;
+    pid_int = finishProcessList[0][i].pid - 'A' + 10 ;
+    if ( pid_int < 10 )
+      pid_int = finishProcessList[0][i].pid - '0' ;
+
+    fprintf( infile, "%d%", pid_int ) ;
+    for ( int j = 0 ; j < 5 ; j++ ) {
+      int turnaround = finishProcessList[j][i].finishTime - finishProcessList[j][i].arrivalTime ; ;
+      fprintf( infile, "\t%d", turnaround ) ;
+    } // for
+
+    if ( i < finishProcessList[0].size()-1 )
+      fprintf( infile, "\n" ) ;
+  } // for
+
+  fprintf( infile, "\n===========================================================\n\n" ) ;
+
+  fclose( infile ) ;
+  cout << "Done\n" ;
+} // WriteFile()
 
 char IdFormat( int pid_int ) {
   char pid_ch ;
@@ -297,11 +421,26 @@ vector<Process> InsertionSort_remain( vector<Process> processList ) {
   return processList ;
 } // InsertionSort_remain()
 
+vector<Process> InsertionSort_priority( vector<Process> processList ) {
+  for ( int i = 1 ; i < processList.size() ; i++ ) {
+    Process key = processList[i] ;
+    int j = i - 1 ; 
+    while( key.priority < processList[j].priority && j >= 0 ) {
+      processList[j+1] = processList[j] ;
+      j-- ;
+    } // while
+
+    processList[j+1] = key ;
+  } // for
+
+  return processList ;
+} // InsertionSort_priority()
+
 vector<Process> InsertionSort_responseRatio( vector<Process> processList ) {
   for ( int i = 1 ; i < processList.size() ; i++ ) {
     Process key = processList[i] ;
     int j = i - 1 ; 
-    while( key.responseRatio <= processList[j].responseRatio && j >= 0 ) {
+    while( key.responseRatio >= processList[j].responseRatio && j >= 0 ) {
       if ( key.responseRatio == processList[j].responseRatio ) {
         if ( key.arrivalTime <= processList[j].arrivalTime ) {
           if ( key.arrivalTime == processList[j].arrivalTime ) {
@@ -370,41 +509,17 @@ bool IsSR( Process running, Process waiting ) {
     return false ;
 } // IsSR
 
-bool IsSRR( Process running, Process waiting ) {
-  if ( running.responseRatio <= waiting.responseRatio ) {
-    if ( running.responseRatio == waiting.responseRatio ) {
-      if ( running.arrivalTime <= waiting.arrivalTime ) {
-        if ( running.arrivalTime == waiting.arrivalTime ) {
-          if ( running.pid < waiting.pid ) {
-            return true ;
-          } // if
-
-          else
-            return false ;
-        } // if
-
-        else {
-          return true ;
-        } // else
-      } // if
-
-      else {
-        return false ;
-      } // else
-    } // if
-
-    else {
-      return true ;
-    } // else
+bool IsHighPriority( Process running, Process waiting ) {
+  if ( running.priority >= waiting.priority ) {
+    return false ;
   } // if
 
-  else
-    return false ;
+  return true ;
 } // IsSRR()
 
 float CalResponseRatio( Process process ) {
-  int waiting = timer - process.arrivalTime - ( process.cpuBrust - process.remainTime ) ;
-  return waiting / process.cpuBrust + 1 ;
+  float waiting = timer - process.arrivalTime ;
+  return (waiting / process.cpuBrust) ;
 } // CalResponseRatio()
 
 vector<Process> FCFS( vector<Process> processList ) {
@@ -430,10 +545,6 @@ vector<Process> FCFS( vector<Process> processList ) {
     } // while
 
     done = !cpu.Processing() ;
-    if ( cpu.IsIdle() && !readyQueue.empty() ) {
-      cpu.ContextSwitch( readyQueue, finishProcess ) ;
-    } // if
-
     if ( done ) {
       cpu.ContextSwitch( readyQueue, finishProcess ) ;
       done = false ;
@@ -471,10 +582,6 @@ vector<Process> RR( vector<Process> processList ) {
     } // while
 
     done = !cpu.Processing() ;
-    if ( cpu.IsIdle() && !readyQueue.empty() ) {
-      cpu.ContextSwitch( readyQueue, finishProcess ) ;
-    } // else
-
     if ( done || timeSliceCounter == gTimeSlice) {
       cpu.ContextSwitch( readyQueue, finishProcess ) ;
       done = false ;
@@ -534,7 +641,78 @@ vector<Process> SRTF( vector<Process> processList ) {
 } // SRTF()
 
 vector<Process> PPRR( vector<Process> processList ) {
+  int processIndex = 0 ;
+  int timeSliceCounter = 0 ;
+  bool done = false ;
+  vector<Process> readyQueue ;
+  vector<Process> finishProcess ;
 
+  while ( processIndex < processList.size() && processList[processIndex].arrivalTime == timer ) {
+    readyQueue.push_back( processList[processIndex] ) ;
+    processIndex++ ;
+  } // while
+
+  InsertionSort_priority( readyQueue ) ;
+
+  if ( !readyQueue.empty() ) {
+    cpu.ContextSwitch( readyQueue, finishProcess ) ;
+    InsertionSort_priority( readyQueue ) ;
+    timeSliceCounter++ ;
+  } // if
+
+  timer++ ;
+
+  while ( processIndex < processList.size() || !cpu.IsIdle() ) { // PPRR
+    bool isHighPriority = true ;
+    bool equal = false ;
+    done = !cpu.Processing() ;
+    while ( processIndex < processList.size() && processList[processIndex].arrivalTime == timer ) {
+      readyQueue.push_back( processList[processIndex] ) ;
+      processIndex++ ;
+    } // while
+
+    readyQueue = InsertionSort_priority( readyQueue ) ;
+    
+    if ( !cpu.IsIdle() && !readyQueue.empty() ) {
+      isHighPriority = IsHighPriority( cpu.GetRunningProcessInfo(), readyQueue[0] ) ;
+      if ( !isHighPriority && cpu.GetRunningProcessInfo().priority == readyQueue[0].priority )
+        equal = true ;
+    } // if
+
+    if ( done ) {
+      cpu.ContextSwitch( readyQueue, finishProcess ) ;
+      readyQueue = InsertionSort_priority( readyQueue ) ;
+      done = false ;
+      timeSliceCounter = 0 ;
+    } // if
+ 
+    else if ( timeSliceCounter == gTimeSlice ) {
+      if ( equal || !isHighPriority ) {
+        cpu.ContextSwitch( readyQueue, finishProcess ) ;
+        readyQueue = InsertionSort_priority( readyQueue ) ;
+        done = false ;
+        timeSliceCounter = 0 ;
+      } // if
+
+      else {
+        timeSliceCounter = 0 ;
+      } // else
+    } // else if
+
+    else { // isHighPriority or equal
+      if ( !isHighPriority && !equal ) {
+        cpu.ContextSwitch( readyQueue, finishProcess ) ;
+        readyQueue = InsertionSort_priority( readyQueue ) ;
+        done = false ;
+        timeSliceCounter = 0 ;
+      } // if
+    } // else
+    
+    timer++ ;
+    timeSliceCounter++ ;
+  } // while
+
+  return finishProcess ;
 } // PPRR()
 
 vector<Process> HRRN( vector<Process> processList ) {
@@ -564,15 +742,6 @@ vector<Process> HRRN( vector<Process> processList ) {
       processIndex++ ;
     } // while
 
-    /*if ( cpu.IsIdle() ) {
-      for ( int i = 0 ; i < readyQueue.size() ; i++ ) {
-        readyQueue[i].responseRatio = CalResponseRatio( readyQueue[i] ) ;
-      } // for
-
-      readyQueue = InsertionSort_responseRatio( readyQueue ) ;
-      cpu.ContextSwitch( readyQueue, finishProcess ) ;
-    } // if */
-    
     if ( done ) {
       for ( int i = 0 ; i < readyQueue.size() ; i++ ) {
         readyQueue[i].responseRatio = CalResponseRatio( readyQueue[i] ) ;
@@ -624,9 +793,9 @@ void Cpu :: ContextSwitch( vector<Process> &readyQueue, vector<Process> &finishP
     if ( !readyQueue.empty() ) {
       gTempP = readyQueue[0] ;
       runningProcess = &gTempP ;
-      swap( readyQueue[0], readyQueue[readyQueue.size()-1] ) ;
-      //runningProcess = &readyQueue[readyQueue.size()-1] ; 
+      reverse( readyQueue.begin(), readyQueue.end() ) ;
       readyQueue.pop_back() ;
+      reverse( readyQueue.begin(), readyQueue.end() ) ;
     } // if
   } // if
 
@@ -636,9 +805,9 @@ void Cpu :: ContextSwitch( vector<Process> &readyQueue, vector<Process> &finishP
     if ( !readyQueue.empty() ) {
       gTempP = readyQueue[0] ;
       runningProcess = &gTempP ;
-      swap( readyQueue[0], readyQueue[readyQueue.size()-1] ) ;
-      //runningProcess = &readyQueue[readyQueue.size()-1] ; 
+      reverse( readyQueue.begin(), readyQueue.end() ) ;
       readyQueue.pop_back() ;
+      reverse( readyQueue.begin(), readyQueue.end() ) ;
     } // if
 
     else {
@@ -651,9 +820,9 @@ void Cpu :: ContextSwitch( vector<Process> &readyQueue, vector<Process> &finishP
       readyQueue.push_back( *runningProcess ) ;
       gTempP = readyQueue[0] ;
       runningProcess = &gTempP ;
-      swap( readyQueue[0], readyQueue[readyQueue.size()-1] ) ;
-      //runningProcess = &readyQueue[readyQueue.size()-1] ; 
+      reverse( readyQueue.begin(), readyQueue.end() ) ;
       readyQueue.pop_back() ;
+      reverse( readyQueue.begin(), readyQueue.end() ) ;
     } // if
   } // else
 } // ContextSwitch()
@@ -666,7 +835,7 @@ bool Cpu :: IsIdle() {
 } // ISIdle()
 
 bool Cpu :: Processing() { 
-  // 以1個時間單位為單位 
+  // ¥H1­Ó®É¶¡³æ¦ì¬°³æ¦ì 
   // return if a process is done
   // false if process is done, true if process still running
   if ( runningProcess == NULL ) {
